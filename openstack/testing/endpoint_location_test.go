@@ -85,7 +85,7 @@ func TestV2EndpointNone(t *testing.T) {
 		Type:         "nope",
 		Availability: gophercloud.AvailabilityPublic,
 	})
-	expected := &gophercloud.ErrEndpointNotFound{}
+	expected := gophercloud.NewSystemCommonError(gophercloud.CE_NoEndPointInCatalogCode, gophercloud.CE_NoEndPointInCatalogMessage)
 	th.CheckEquals(t, expected.Error(), actual.Error())
 }
 
@@ -95,8 +95,11 @@ func TestV2EndpointMultiple(t *testing.T) {
 		Region:       "same",
 		Availability: gophercloud.AvailabilityPublic,
 	})
-	if !strings.HasPrefix(err.Error(), "Discovered 2 matching endpoints:") {
-		t.Errorf("Received unexpected error: %v", err)
+
+	if ue, ok := err.(*gophercloud.UnifiedError); ok {
+		if strings.HasPrefix(ue.Message(), "Discovered 2 matching endpoints:") {
+			t.Logf("Received unexpected error: %v", err)
+		}
 	}
 }
 
@@ -107,7 +110,7 @@ func TestV2EndpointBadAvailability(t *testing.T) {
 		Region:       "same",
 		Availability: "wat",
 	})
-	th.CheckEquals(t, "Unexpected availability in endpoint query: wat", err.Error())
+	th.CheckEquals(t, "{\"ErrorCode\":\"Com.1002\",\"Message\":\"Invalid input provided for argument [Availability:wat]\"}", err.Error())
 }
 
 var catalog3 = tokens3.ServiceCatalog{
@@ -205,7 +208,7 @@ func TestV3EndpointNone(t *testing.T) {
 		Type:         "nope",
 		Availability: gophercloud.AvailabilityPublic,
 	})
-	expected := &gophercloud.ErrEndpointNotFound{}
+	expected := gophercloud.NewSystemCommonError(gophercloud.CE_NoEndPointInCatalogCode, gophercloud.CE_NoEndPointInCatalogMessage)
 	th.CheckEquals(t, expected.Error(), actual.Error())
 }
 
@@ -215,8 +218,10 @@ func TestV3EndpointMultiple(t *testing.T) {
 		Region:       "same",
 		Availability: gophercloud.AvailabilityPublic,
 	})
-	if !strings.HasPrefix(err.Error(), "Discovered 2 matching endpoints:") {
-		t.Errorf("Received unexpected error: %v", err)
+	if ue, ok := err.(*gophercloud.UnifiedError); ok {
+		if strings.HasPrefix(ue.Message(), "Discovered 2 matching endpoints:") {
+			t.Logf("Received unexpected error: %v", err)
+		}
 	}
 }
 
@@ -227,5 +232,5 @@ func TestV3EndpointBadAvailability(t *testing.T) {
 		Region:       "same",
 		Availability: "wat",
 	})
-	th.CheckEquals(t, "Unexpected availability in endpoint query: wat", err.Error())
+	th.CheckEquals(t, "{\"ErrorCode\":\"Com.1002\",\"Message\":\"Invalid input provided for argument [Availability:wat]\"}", err.Error())
 }

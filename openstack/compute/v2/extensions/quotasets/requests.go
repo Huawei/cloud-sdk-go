@@ -4,6 +4,13 @@ import (
 	"github.com/gophercloud/gophercloud"
 )
 
+// GetLimits returns limits public data about a previously created QuotaSet.
+func GetLimits(client *gophercloud.ServiceClient) GetLimitResult {
+	var res GetLimitResult
+	_, res.Err = client.Get(getLimitURL(client), &res.Body, nil)
+	return res
+}
+
 // Get returns public data about a previously created QuotaSet.
 func Get(client *gophercloud.ServiceClient, tenantID string) GetResult {
 	var res GetResult
@@ -15,6 +22,12 @@ func Get(client *gophercloud.ServiceClient, tenantID string) GetResult {
 func GetDetail(client *gophercloud.ServiceClient, tenantID string) GetDetailResult {
 	var res GetDetailResult
 	_, res.Err = client.Get(getDetailURL(client, tenantID), &res.Body, nil)
+	return res
+}
+
+func GetDefault(client *gophercloud.ServiceClient, ProjectID string) GetDefaultResult {
+	var res GetDefaultResult
+	_, res.Err = client.Get(getDefaultURL(client, ProjectID), &res.Body, nil)
 	return res
 }
 

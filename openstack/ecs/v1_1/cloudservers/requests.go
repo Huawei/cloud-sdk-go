@@ -84,13 +84,51 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (jobId, o
 	}
 
 	job, errJob := r.ExtractJob()
+	if errJob != nil {
+		err = errJob
+		return
+	}
 	order, errOrder := r.ExtractOrder()
-	if errJob != nil && errOrder != nil {
+	if errOrder != nil {
+		err = errOrder
 		return
 	}
 
 	jobId = job.Id
 	orderId = order.Id
+	return
+}
+
+// CreateServer requests a server to be provisioned to the user in the current tenant with response entity.
+func CreateServer(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (createResult CreateCloudServerResponse, err error) {
+	var r CreateResult
+	reqBody, err := opts.ToServerCreateMap()
+	if err != nil {
+		return
+	}
+
+	_, err = client.Post(createURL(client), reqBody, &r.Body, &gophercloud.RequestOpts{OkCodes: []int{200}})
+	if err != nil {
+		return
+	}
+	job, errJob := r.ExtractJob()
+	if errJob != nil {
+		err = errJob
+		return
+	}
+	order, errOrder := r.ExtractOrder()
+	if errOrder != nil {
+		err = errOrder
+		return
+	}
+	server, errServer := r.ExtractServer()
+	if errServer != nil {
+		err = errServer
+		return
+	}
+	createResult = CreateCloudServerResponse{Job: job,
+		Order:  order,
+		Server: server}
 	return
 }
 
@@ -168,7 +206,7 @@ type BandWidth struct {
 	//带宽（Mbit/s），取值范围为[1,300]。
 	Size int `json:"size,omitempty"`
 
-	//带宽的共享类型。PER，表示独享，WHOLE，表示独享。
+	//带宽的共享类型。PER，表示独享，WHOLE，表示共享。
 	ShareType string `json:"sharetype" required:"true"`
 
 	//带宽的计费类型。
@@ -234,6 +272,9 @@ type ServerExtendParam struct {
 
 	//下单订购后，是否自动从客户的账户中支付，而不需要客户手动去进行支付。
 	IsAutoPay string `json:"isAutoPay,omitempty"`
+
+	//企业项目ID。
+	EnterpriseProjectID string `json:"enterprise_project_id,omitempty"`
 
 	//是否配置虚拟机自动恢复的功能。
 	SupportAutoRecovery string `json:"support_auto_recovery,omitempty"`

@@ -17,7 +17,7 @@ import (
 )
 
 // DefaultUserAgent is the default User-Agent string set in the request header.
-const DefaultUserAgent = "gophercloud/2.0.0"
+const DefaultUserAgent = "huawei-cloud-sdk-go/1.0.21"
 
 // ProviderClient stores details that are required to interact with any
 // services within a specific provider's API.
@@ -57,15 +57,21 @@ type ProviderClient struct {
 	// authentication functions for different Identity service versions.
 	ReauthFunc func() error
 
+	// mut is a mutex for the client. It protects read and write access to client attributes such as getting
+	// and setting the TokenID.
 	mut *sync.RWMutex
 
+	// reauthmut is a mutex for reauthentication it attempts to ensure that only one reauthentication
+	// attempt happens at one time.
 	reauthmut *reauthlock
 
-	/************自研参数************/
+	// DomainID
 	DomainID string
 
+	// ProjectID
 	ProjectID string
 
+	// Conf define the configs parameter of the provider client
 	Conf *Config
 
 	// AKSKAuthOptions provides the value for AK/SK authentication, it should be nil if you use token authentication,
@@ -73,22 +79,13 @@ type ProviderClient struct {
 	AKSKOptions aksk.AKSKOptions
 }
 
-type Config struct {
-	AutoRetry    bool `default:"true"`
-	MaxRetryTime int  `default:"3"`
-}
-
-func NewConfig() (conf *Config) {
-	conf = &Config{}
-	InitStructWithDefaultTag(conf)
-	return
-}
-
+// reauthlock represents a set of attributes used to help in the reauthentication process.
 type reauthlock struct {
 	sync.RWMutex
 	reauthing bool
 }
 
+//GetProjectID,Implement the GetProjectID() interface, return client projectID.
 func (client *ProviderClient) GetProjectID() string {
 	return client.ProjectID
 }
@@ -190,6 +187,8 @@ type RequestOpts struct {
 	// ErrorContext specifies the resource error type to return if an error is encountered.
 	// This lets resources override default error messages based on the response status code.
 	ErrorContext error
+
+	HandleError func(httpStatus int, responseContent string) error
 }
 
 var applicationJSON = "application/json"
@@ -202,9 +201,6 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 		return nil, err
 	}
 	log := GetLogger()
-
-	log.Debug(fmt.Sprintf("Request method is %s,Request url is %s", req.Method, req.URL.String()))
-	log.Debug(fmt.Sprintf("Request header is %s", req.Header))
 	prereqtok := req.Header.Get("X-Auth-Token")
 	var resp *http.Response
 
@@ -247,6 +243,9 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 		log.Debug("Request error", err)
 		return nil, err
 	}
+
+	log.Debug("Request method is %s,Request url is %s", req.Method, url)
+	log.Debug("Request header is %s", req.Header)
 	log.Debug("Response status code is %d", resp.StatusCode)
 	log.Debug("Response header is %s", resp.Header)
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
@@ -294,6 +293,10 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 			if client.ReauthFunc != nil && b {
 				return doReauthAndReq(client, prereqtok, method, url, options)
 			}
+		}
+
+		if options.HandleError != nil {
+			return resp, options.HandleError(resp.StatusCode, string(body))
 		}
 
 		return resp, NewSystemServerError(resp.StatusCode, string(body))
@@ -382,8 +385,8 @@ func buildReq(client *ProviderClient, method, url string, options *RequestOpts) 
 func doReauthAndReq(client *ProviderClient, prereqtok, method, url string, options *RequestOpts) (*http.Response, error) {
 	err := client.Reauthenticate(prereqtok)
 	if err != nil {
-		fmt.Sprintf(CE_ReauthFuncErrorMessage, err.Error())
-		return nil, NewSystemCommonError(CE_ReauthFuncErrorCode, CE_ReauthFuncErrorMessage)
+		message:=fmt.Sprintf(CE_ReauthFuncErrorMessage, err.Error())
+		return nil, NewSystemCommonError(CE_ReauthFuncErrorCode, message)
 	}
 	if options.RawBody != nil {
 		if seeker, ok := options.RawBody.(io.Seeker); ok {
